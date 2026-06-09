@@ -249,4 +249,219 @@ def get_smart_boarding_tip(passenger_flow):
                                - least_crowded["passengers"],
             "rush":            least_crowded["rush"],
         }
-    return tip    
+    return tip   
+# ── LIVE STOP RUSH CHECKER ─────────────────────────────────
+# Simulates real-time passenger tracking between stops
+# In production: replace simulate_current_bus_data()
+# with actual APSRTC ETM API call
+
+import datetime
+
+def simulate_current_bus_data(route, hour, day,
+                               weather, is_holiday):
+    """
+    Simulates what an APSRTC ETM API would return.
+    Returns live-like passenger count at each stop
+    as if the bus is currently mid-journey.
+
+    In production replace this entire function with:
+        response = requests.get(APSRTC_API_URL, params={...})
+        return response.json()
+    """
+    stops    = ROUTES[route]["stops"]
+    capacity = ROUTES[route]["capacity"]
+
+    # Use ML model to get overall predicted load
+    result     = predict_rush(route, day, hour, weather,
+                               is_holiday,
+                               day in ["Saturday","Sunday"])
+    rush_level = result["rush_level"]
+
+    load_map   = {"Low": 0.28, "Medium": 0.55, "High": 0.88}
+    base_load  = capacity * load_map.get(rush_level, 0.5)
+
+    if is_peak(hour):       base_load *= 1.20
+    if weather == "Rainy":  base_load *= 1.18
+
+    # Simulate how many passengers are at each stop
+    # as the bus travels through the route
+    random.seed(hash(f"{route}{day}{hour}{weather}late") % (2**31))
+
+    stop_data = []
+    running_passengers = 0
+
+    for i, stop in enumerate(stops):
+        if i == 0:
+            # Origin stop — most passengers board here
+            boarded  = int(base_load * 0.55
+                           * random.uniform(0.88, 1.12))
+            boarded  = min(boarded, capacity)
+            alighted = 0
+        else:
+            # Subsequent stops — some board, some alight
+            board_rate  = max(0.08 - (i * 0.01), 0.03)
+            alight_rate = max(0.12 + (i * 0.02), 0.05)
+
+            boarded  = int(capacity * board_rate
+                           * random.uniform(0.80, 1.20))
+            alighted = int(running_passengers * alight_rate
+                           * random.uniform(0.80, 1.20))
+            boarded  = min(boarded,
+                           capacity - running_passengers)
+
+        running_passengers = (running_passengers
+                              + boarded - alighted)
+        running_passengers = max(0, min(running_passengers,
+                                        capacity))
+        pct = round(running_passengers / capacity * 100, 1)
+
+        stop_data.append({
+            "stop_index":    i,
+            "stop_name":     stop,
+            "passengers_boarded_here":  boarded,
+            "passengers_alighted_here": alighted,
+            "current_on_bus":  running_passengers,
+            "capacity":        capacity,
+            "percentage":      pct,
+            "rush":  "High"   if pct >= 75
+                     else ("Medium" if pct >= 40
+                     else "Low"),
+            "color": "#E74C3C" if pct >= 75
+                     else ("#F39C12" if pct >= 40
+                     else "#27AE60"),
+        })
+
+    return stop_data
+
+
+def get_avg_time_per_stop(route):
+    """Average travel time in minutes between consecutive stops."""
+    time_map = {
+        "Guntur-Amaravati":    12,
+        "Guntur-Brodipet":      8,
+        "Guntur-Nallapadu":    10,
+        "Guntur-Mangalagiri":  11,
+        "Guntur-Tenali":       14,
+        "Guntur-Ponnur":       15,
+        "Guntur-Sattenapalli": 16,
+        "Guntur-Narasaraopet": 18,
+        "Tenali-Repalle":      14,
+        "Tenali-Bapatla":      13,
+        "Tenali-Chirala":      15,
+        "Tenali-Guntur":       14,
+        "Tenali-Vijayawada":   15,
+        "Tenali-Ongole":       20,
+    }
+    return time_map.get(route, 12)
+
+
+def get_realtime_stop_rush(route, day, hour,
+                            weather, is_holiday,
+                            user_stop_name,
+                            bus_current_stop_name):
+    """
+    MAIN FUNCTION for the real-time feature.
+
+    A person is standing at user_stop_name.
+    The bus is currently at bus_current_stop_name.
+
+    Returns:
+    - How many passengers are on the bus RIGHT NOW
+    - How crowded it is at each previous stop
+    - How many minutes until it reaches user's stop
+    - Predicted rush when it arrives at user's stop
+    """
+    stops    = ROUTES[route]["stops"]
+    capacity = ROUTES[route]["capacity"]
+
+    # Validate stops exist on this route
+    if user_stop_name not in stops:
+        return {"error": f"'{user_stop_name}' not on {route}"}
+    if bus_current_stop_name not in stops:
+        return {"error": f"'{bus_current_stop_name}' not on {route}"}
+
+    user_stop_idx = stops.index(user_stop_name)
+    bus_stop_idx  = stops.index(bus_current_stop_name)
+
+    # Bus must be BEFORE user's stop
+    if bus_stop_idx >= user_stop_idx:
+        return {
+            "error": "Bus has already passed your stop or "
+                     "is at the same stop."
+        }
+
+    # Get simulated live data for all stops
+    all_stop_data = simulate_current_bus_data(
+        route, hour, day, weather, is_holiday
+    )
+
+    # Current bus status (at its current stop)
+    current_bus = all_stop_data[bus_stop_idx]
+
+    # Stops the bus has already visited
+    visited_stops = all_stop_data[:bus_stop_idx + 1]
+
+    # Stops between current bus position and user's stop
+    stops_to_travel = user_stop_idx - bus_stop_idx
+
+    # Time until bus reaches user's stop
+    mins_per_stop  = get_avg_time_per_stop(route)
+    minutes_away   = stops_to_travel * mins_per_stop
+
+    # Predict what load will be when it reaches user's stop
+    # Account for boarding and alighting between now and then
+    current_passengers = current_bus["current_on_bus"]
+
+    for i in range(bus_stop_idx + 1, user_stop_idx + 1):
+        stop_sim     = all_stop_data[i]
+        current_passengers = stop_sim["current_on_bus"]
+
+    predicted_at_user_stop    = current_passengers
+    predicted_pct             = round(
+        predicted_at_user_stop / capacity * 100, 1
+    )
+
+    predicted_rush = ("High"   if predicted_pct >= 75
+                      else ("Medium" if predicted_pct >= 40
+                      else "Low"))
+    predicted_color = ("#E74C3C" if predicted_pct >= 75
+                       else ("#F39C12" if predicted_pct >= 40
+                       else "#27AE60"))
+
+    # Arrival time estimate
+    now           = datetime.datetime.now()
+    arrival_time  = now + datetime.timedelta(minutes=minutes_away)
+    arrival_str   = arrival_time.strftime("%I:%M %p")
+
+    return {
+        # Current bus status
+        "bus_current_stop":      bus_current_stop_name,
+        "bus_current_stop_idx":  bus_stop_idx,
+        "current_passengers":    current_bus["current_on_bus"],
+        "current_capacity":      capacity,
+        "current_percentage":    current_bus["percentage"],
+        "current_rush":          current_bus["rush"],
+        "current_color":         current_bus["color"],
+
+        # User's stop info
+        "user_stop":             user_stop_name,
+        "user_stop_idx":         user_stop_idx,
+
+        # Journey info
+        "stops_away":            stops_to_travel,
+        "minutes_away":          minutes_away,
+        "estimated_arrival":     arrival_str,
+
+        # Prediction at user's stop
+        "predicted_passengers":  predicted_at_user_stop,
+        "predicted_percentage":  predicted_pct,
+        "predicted_rush":        predicted_rush,
+        "predicted_color":       predicted_color,
+
+        # All stop history for display
+        "visited_stops":         visited_stops,
+        "all_stops":             all_stop_data,
+        "total_stops":           len(stops),
+        "route_stops":           stops,
+        "capacity":              capacity,
+    } 

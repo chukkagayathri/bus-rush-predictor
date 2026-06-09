@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-md-8 col-lg-7">
+
+    <div class="text-center mb-4">
+        <h2 class="fw-bold">
+            🔴 Live Stop Rush Checker
+        </h2>
+        <p class="text-muted">
+            Check how crowded the bus is RIGHT NOW at any stop —
+            and how crowded it will be when it reaches you.
+        </p>
+    </div>
+
+    <!-- HOW IT WORKS BANNER -->
+    <div class="alert alert-info mb-4">
+        <h6 class="fw-bold mb-2">📖 How this works:</h6>
+        <ol class="mb-0 small">
+            <li>Select your route and travel details</li>
+            <li>Tell us <strong>where you are standing</strong>
+                (your stop)</li>
+            <li>Tell us <strong>where the bus currently is</strong>
+                (previous stop)</li>
+            <li>We show you the bus load at every stop it
+                visited AND predict how crowded it will be
+                when it reaches you</li>
+        </ol>
+    </div>
+
+    <!-- ERROR MESSAGE -->
+    {% if error %}
+    <div class="alert alert-danger mb-4">
+        ❌ {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- INPUT FORM -->
+    <div class="card shadow-sm mb-4">
+    <div class="card-header text-white fw-bold"
+         style="background:#1a252f">
+        🚌 Enter Your Journey Details
+    </div>
+    <div class="card-body p-4">
+    <form method="POST" id="liveForm">
+
+        <!-- Route -->
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                🚌 Bus Route
+            </label>
+            <select name="route" id="routeSelect"
+                    class="form-select" required
+                    onchange="updateStops()">
+                <option value="">Select route...</option>
+                {% for route in routes %}
+                <option value="{{ route }}"
+                    {% if result and result.user_stop
+                       and route == request.form.get('route') %}
+                    selected{% endif %}>
+                    {{ route }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <!-- Day -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">
+                    📅 Day
+                </label>
+                <select name="day" class="form-select" required>
+                    <option value="">Select day...</option>
+                    {% for day in days %}
+                    <option value="{{ day }}">{{ day }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Hour -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">
+                    🕐 Current Time
+                </label>
+                <select name="hour" class="form-select" required>
+                    <option value="">Select time...</option>
+                    {% for h in hours %}
+                    <option value="{{ h }}">
+                        {{ format_hour(h) }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Weather -->
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                🌤️ Weather Right Now
+            </label>
+            <select name="weather" class="form-select" required>
+                <option value="">Select weather...</option>
+                {% for w in weather_options %}
+                <option value="{{ w }}">{{ w }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- YOUR STOP -->
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                📍 Your Stop
+                <small class="text-muted fw-normal">
+                    (where YOU are standing right now)
+                </small>
+            </label>
+            <select name="user_stop" id="userStopSelect"
+                    class="form-select" required>
+                <option value="">
+                    Select route first...
+                </option>
+            </select>
+        </div>
+
+        <!-- BUS CURRENT STOP -->
+        <div class="mb-4">
+            <label class="form-label fw-semibold">
+                🚌 Bus Is Currently At
+                <small class="text-muted fw-normal">
+                    (which stop did the bus just leave from?)
+                </small>
+            </label>
+            <select name="bus_current_stop"
+                    id="busStopSelect"
+                    class="form-select" required>
+                <option value="">
+                    Select route first...
+                </option>
+            </select>
+        </div>
+
+        <!-- Holiday -->
+        <div class="mb-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="is_holiday">
+                <label class="form-check-label fw-semibold">
+                    🎉 Public holiday today?
+                </label>
+            </div>
+        </div>
+
+        <button type="submit"
+                class="btn btn-danger w-100 py-2 fw-bold">
+            🔴 Check Live Rush Now
+        </button>
+
+    </form>
+    </div>
+    </div>
+
+    <!-- ─── RESULT SECTION ─────────────────────────────── -->
+    {% if result %}
+
+    <!-- BUS STATUS RIGHT NOW -->
+    <div class="card shadow mb-4"
+         style="border-left:5px solid {{ result.current_color }};
+                background:{% if result.current_rush=='High' %}
+                #FDEDEC{% elif result.current_rush=='Medium' %}
+                #FEF9EC{% else %}#EAFAF1{% endif %}">
+        <div class="card-body text-center py-4">
+            <div class="text-muted small mb-1">
+                🚌 Bus is currently at
+            </div>
+            <h4 class="fw-bold">
+                {{ result.bus_current_stop }}
+            </h4>
+            <div style="font-size:3rem" class="my-2">
+                {% if result.current_rush=='High' %}🔴
+                {% elif result.current_rush=='Medium' %}🟡
+                {% else %}🟢{% endif %}
+            </div>
+            <h3 class="fw-bold"
+                style="color:{{ result.current_color }}">
+                {{ result.current_rush }} Rush Right Now
+            </h3>
+            <div class="fs-5 fw-bold mt-1">
+                {{ result.current_passengers }}
+                <span class="text-muted fw-normal fs-6">
+                    / {{ result.current_capacity }} passengers
+                </span>
+            </div>
+            <div class="mt-2">
+                <div class="progress mx-auto"
+                     style="height:14px;max-width:280px">
+                    <div class="progress-bar"
+                         style="width:{{ result.current_percentage }}%;
+                                background:{{ result.current_color }};
+                                font-size:0.75rem"
+                         role="progressbar">
+                        {{ result.current_percentage }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREDICTION AT USER'S STOP -->
+    <div class="card shadow mb-4"
+         style="border-left:5px solid
+                {{ result.predicted_color }};
+                background:{% if result.predicted_rush=='High'
+                %}#FDEDEC{% elif result.predicted_rush=='Medium'
+                %}#FEF9EC{% else %}#EAFAF1{% endif %}">
+        <div class="card-header fw-bold"
+             style="background:#1a252f;color:white">
+            🎯 When Bus Reaches You — {{ result.user_stop }}
+        </div>
+        <div class="card-body text-center py-4">
+            <div class="row">
+                <div class="col-4">
+                    <div class="text-muted small">
+                        ⏰ Arrives in
+                    </div>
+                    <div class="fw-bold fs-4 text-primary">
+                        {{ result.minutes_away }}
+                        <small class="fs-6">min</small>
+                    </div>
+                    <div class="text-muted small">
+                        ~{{ result.estimated_arrival }}
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="text-muted small">
+                        👥 Expected passengers
+                    </div>
+                    <div class="fw-bold fs-4"
+                         style="color:
+                                {{ result.predicted_color }}">
+                        {{ result.predicted_passengers }}
+                    </div>
+                    <div class="text-muted small">
+                        {{ result.predicted_percentage }}%
+                        full
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="text-muted small">
+                        Rush level
+                    </div>
+                    <div style="font-size:2rem">
+                        {% if result.predicted_rush=='High' %}🔴
+                        {% elif result.predicted_rush=='Medium'
+                        %}🟡
+                        {% else %}🟢{% endif %}
+                    </div>
+                    <div class="fw-bold small"
+                         style="color:
+                                {{ result.predicted_color }}">
+                        {{ result.predicted_rush }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress mt-3 mx-auto"
+                 style="height:14px;max-width:300px">
+                <div class="progress-bar fw-bold"
+                     style="width:
+                            {{ result.predicted_percentage }}%;
+                            background:
+                            {{ result.predicted_color }};
+                            font-size:0.75rem">
+                    {{ result.predicted_percentage }}%
+                </div>
+            </div>
+
+            <!-- Advice -->
+            <div class="mt-3 alert
+                {% if result.predicted_rush=='High' %}
+                alert-danger
+                {% elif result.predicted_rush=='Medium' %}
+                alert-warning
+                {% else %}alert-success{% endif %}
+                mb-0 small fw-semibold">
+                {% if result.predicted_rush=='High' %}
+                    🔴 Bus will be very crowded when it
+                    arrives. Consider waiting for the
+                    next bus or departing from an earlier
+                    stop.
+                {% elif result.predicted_rush=='Medium' %}
+                    🟡 Moderately crowded. Arrive at the
+                    stop early to secure a seat.
+                {% else %}
+                    🟢 Comfortable journey expected.
+                    Seats should be available!
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- STOP-BY-STOP HISTORY -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header text-white fw-bold"
+             style="background:#1a252f">
+            📍 Passenger Count at Every Stop
+            <small class="text-muted ms-2">
+                Bus journey so far + prediction ahead
+            </small>
+        </div>
+        <div class="card-body p-0">
+            {% for stop in result.all_stops %}
+            <div class="p-3 border-bottom
+                        {% if stop.stop_name ==
+                           result.bus_current_stop %}
+                        border-start border-4
+                        {% endif %}"
+                 style="
+                 {% if stop.stop_name ==
+                    result.user_stop %}
+                    background:#EAF4FB;
+                 {% elif stop.stop_name ==
+                    result.bus_current_stop %}
+                    background:#FEF9EC;
+                 {% elif stop.stop_index >
+                    result.bus_current_stop_idx %}
+                    background:#F8F9FA;opacity:0.7;
+                 {% endif %}">
+
+                <div class="d-flex align-items-center
+                             justify-content-between">
+                    <div class="d-flex align-items-center
+                                 gap-2">
+                        <!-- Stop indicator -->
+                        <div class="text-center"
+                             style="min-width:28px">
+                            {% if stop.stop_name ==
+                               result.bus_current_stop %}
+                            <span class="badge bg-warning
+                                          text-dark">
+                                🚌 NOW
+                            </span>
+                            {% elif stop.stop_name ==
+                               result.user_stop %}
+                            <span class="badge bg-primary">
+                                📍 YOU
+                            </span>
+                            {% elif stop.stop_index 
+                               result.bus_current_stop_idx %}
+                            <span class="badge bg-secondary">
+                                ✓ {{ stop.stop_index + 1 }}
+                            </span>
+                            {% else %}
+                            <span class="badge"
+                                  style="background:#dee2e6;
+                                         color:#666">
+                                {{ stop.stop_index + 1 }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Stop name -->
+                        <div>
+                            <div class="fw-bold small">
+                                {{ stop.stop_name }}
+                            </div>
+                            {% if stop.stop_index <=
+                               result.bus_current_stop_idx %}
+                            <div class="text-muted"
+                                 style="font-size:0.75rem">
+                                +{{ stop.passengers_boarded_here
+                                }} boarded,
+                                -{{ stop.passengers_alighted_here
+                                }} alighted
+                            </div>
+                            {% else %}
+                            <div class="text-muted"
+                                 style="font-size:0.75rem">
+                                ⏳ Not yet reached
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Passenger count -->
+                    <div class="text-end">
+                        {% if stop.stop_index <=
+                           result.bus_current_stop_idx
+                           or stop.stop_name ==
+                           result.user_stop %}
+                        <span class="badge fs-6 px-3 py-2"
+                              style="background:
+                                     {{ stop.color }}">
+                            {{ stop.current_on_bus }}
+                            pax
+                        </span>
+                        <div class="text-muted mt-1"
+                             style="font-size:0.7rem">
+                            {{ stop.percentage }}% full
+                        </div>
+                        {% else %}
+                        <span class="badge bg-secondary
+                                      px-3 py-2">
+                            --
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Progress bar for visited stops -->
+                {% if stop.stop_index <=
+                   result.bus_current_stop_idx
+                   or stop.stop_name ==
+                   result.user_stop %}
+                <div class="progress mt-2"
+                     style="height:5px">
+                    <div class="progress-bar"
+                         style="width:
+                                {{ stop.percentage }}%;
+                                background:
+                                {{ stop.color }}">
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Legend -->
+        <div class="card-footer bg-light text-center">
+            <small class="text-muted">
+                🚌 Bus current position &nbsp;|&nbsp;
+                📍 Your stop &nbsp;|&nbsp;
+                ✓ Already visited &nbsp;|&nbsp;
+                -- Not yet reached
+            </small>
+        </div>
+    </div>
+
+    <!-- BACK BUTTON -->
+    <div class="d-grid gap-2">
+        <a href="/live" class="btn btn-outline-dark">
+            🔄 Check Another Stop
+        </a>
+        <a href="/" class="btn btn-dark">
+            🏠 Back to Home
+        </a>
+    </div>
+
+    {% endif %}
+
+</div>
+</div>
+
+<!-- JavaScript to dynamically update stop dropdowns -->
+<script>
+// Route stops data from Python
+const routeStops = {{ route_stops | tojson }};
+
+function updateStops() {
+    const route       = document.getElementById(
+                            "routeSelect").value;
+    const userSelect  = document.getElementById(
+                            "userStopSelect");
+    const busSelect   = document.getElementById(
+                            "busStopSelect");
+
+    // Clear existing options
+    userSelect.innerHTML = '<option value="">Your stop...</option>';
+    busSelect.innerHTML  = '<option value="">Bus is at...</option>';
+
+    if (route && routeStops[route]) {
+        const stops = routeStops[route];
+
+        stops.forEach(function(stop, index) {
+            // User stop — any stop except first
+            if (index > 0) {
+                const opt   = document.createElement("option");
+                opt.value   = stop;
+                opt.text    = `📍 ${stop}`;
+                userSelect.appendChild(opt);
+            }
+
+            // Bus current stop — any stop except last
+            if (index < stops.length - 1) {
+                const opt2  = document.createElement("option");
+                opt2.value  = stop;
+                opt2.text   = `🚌 ${stop}`;
+                busSelect.appendChild(opt2);
+            }
+        });
+    }
+}
+
+// Auto-update if route already selected (page reload)
+window.onload = function() {
+    const route = document.getElementById(
+                      "routeSelect").value;
+    if (route) updateStops();
+};
+</script>
+
+{% endblock %}
