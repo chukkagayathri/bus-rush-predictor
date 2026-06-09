@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-md-10">
+
+    <h3 class="fw-bold mb-4">🚌 All APSRTC Routes</h3>
+    <p class="text-muted mb-4">
+        14 routes covered across Guntur and Tenali districts.
+        Click any route to check rush prediction.
+    </p>
+
+    <div class="row g-3">
+    {% for route_name, config in routes.items() %}
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header fw-bold"
+                 style="background:#1a252f;color:white">
+                🚌 {{ route_name }}
+                <span class="badge bg-warning text-dark
+                              float-end">
+                    {{ config.capacity }} seats
+                </span>
+            </div>
+            <div class="card-body">
+                <small class="text-muted d-block mb-2">
+                    {{ config.zone }}
+                </small>
+                <!-- Stops visual -->
+                <div class="d-flex flex-wrap align-items-center
+                             gap-1 mb-3">
+                    {% for stop in config.stops %}
+                    <span class="badge bg-secondary
+                                  px-2 py-1"
+                          style="font-size:0.7rem">
+                        {{ stop }}
+                    </span>
+                    {% if not loop.last %}
+                    <span class="text-muted">→</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <small class="text-muted">
+                    {{ config.stops|length }} stops
+                </small>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="/?route={{ route_name }}"
+                   class="btn btn-sm btn-dark w-100">
+                    Check Rush Level →
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+
+</div>
+</div>
+{% endblock %}

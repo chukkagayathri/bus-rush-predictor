@@ -38,19 +38,24 @@ def predict():
     hourly_forecast = p.get_hourly_forecast(route, day, weather,
                                             is_holiday, is_weekend)
     route_stops     = p.get_route_stops(route)
+    smart_tip = p.get_smart_boarding_tip(passenger_flow)
 
     return render_template(
-        "result.html",
-        route=route, day=day, hour=hour,
-        weather=weather, capacity=capacity,
-        is_holiday=is_holiday,
-        result=result,
-        best_time=best_time,
-        passenger_flow=passenger_flow,
-        hourly_forecast=hourly_forecast,
-        route_stops=route_stops,
-        format_hour=p.format_hour
-    )
+    "result.html",
+    route=route,
+    day=day,
+    hour=hour,
+    weather=weather,
+    capacity=capacity,
+    is_holiday=is_holiday,
+    result=result,
+    best_time=best_time,
+    passenger_flow=passenger_flow,
+    hourly_forecast=hourly_forecast,
+    route_stops=route_stops,
+    smart_tip=smart_tip,
+    format_hour=p.format_hour
+)
 
 @app.route("/about")
 def about():

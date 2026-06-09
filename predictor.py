@@ -213,3 +213,40 @@ if __name__ == "__main__":
               f" → {flow['least_crowded']['to_stop']}"
               f" ({flow['least_crowded']['passengers']} pax)")
     print("\npredictor.py ready ✅")
+def get_smart_boarding_tip(passenger_flow):
+    """
+    Analyse passenger flow and return a smart boarding tip
+    telling the user which stop to board at for
+    the most comfortable journey.
+    """
+    if not passenger_flow or not passenger_flow["flows"]:
+        return None
+
+    direct_flows  = passenger_flow["direct_only"]
+    least_crowded = passenger_flow["least_crowded"]
+    most_crowded  = passenger_flow["most_crowded"]
+
+    # Find the best direct segment
+    if direct_flows:
+        best_direct = min(direct_flows,
+                          key=lambda x: x["passengers"])
+        tip = {
+            "board_at":        best_direct["from_stop"],
+            "alight_at":       best_direct["to_stop"],
+            "passengers":      best_direct["passengers"],
+            "percentage":      best_direct["percentage"],
+            "saving":          most_crowded["passengers"]
+                               - best_direct["passengers"],
+            "rush":            best_direct["rush"],
+        }
+    else:
+        tip = {
+            "board_at":        least_crowded["from_stop"],
+            "alight_at":       least_crowded["to_stop"],
+            "passengers":      least_crowded["passengers"],
+            "percentage":      least_crowded["percentage"],
+            "saving":          most_crowded["passengers"]
+                               - least_crowded["passengers"],
+            "rush":            least_crowded["rush"],
+        }
+    return tip    

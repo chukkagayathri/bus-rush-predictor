@@ -338,6 +338,50 @@
     </div>
     {% endif %}
 
+
+    {% if smart_tip %}
+<div class="card shadow-sm mb-4"
+     style="border-left:4px solid #2980B9">
+    <div class="card-header fw-bold"
+         style="background:#EAF4FB">
+        🎯 Optimal Boarding Recommendation
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-6 border-end">
+                <small class="text-muted d-block">Board at</small>
+                <div class="fw-bold text-primary">
+                    {{ smart_tip.board_at }}
+                </div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted d-block">Alight at</small>
+                <div class="fw-bold text-primary">
+                    {{ smart_tip.alight_at }}
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="text-center">
+            <span class="badge fs-6"
+                  style="background:{{ 
+                  '#E74C3C' if smart_tip.rush=='High' 
+                  else '#F39C12' if smart_tip.rush=='Medium' 
+                  else '#27AE60' }}">
+                {{ smart_tip.passengers }} passengers
+                ({{ smart_tip.percentage }}% capacity)
+            </span>
+            {% if smart_tip.saving > 0 %}
+            <div class="text-success mt-2 small fw-bold">
+                {{ smart_tip.saving }} fewer passengers than
+                the busiest segment!
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
     <!-- ADVICE ALERT -->
     <div class="alert text-center fw-semibold
         {% if result.rush_level=='High' %}alert-danger
