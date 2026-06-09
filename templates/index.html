@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-md-7 col-lg-5">
+
+    <div class="text-center mb-4">
+        <h2 class="fw-bold">Plan Your Journey</h2>
+        <p class="text-muted">
+            Know how crowded your APSRTC bus will be
+            before you leave home.
+        </p>
+    </div>
+
+    <div class="card shadow-sm">
+    <div class="card-body p-4">
+    <form action="/predict" method="POST">
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                🚌 Bus Route
+            </label>
+            <select name="route" class="form-select" required>
+                <option value="">Select route...</option>
+                {% for route in routes %}
+                <option value="{{ route }}">{{ route }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                📅 Day of Travel
+            </label>
+            <select name="day" class="form-select" required>
+                <option value="">Select day...</option>
+                {% for day in days %}
+                <option value="{{ day }}">{{ day }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                🕐 Time of Travel
+            </label>
+            <select name="hour" class="form-select" required>
+                <option value="">Select time...</option>
+                {% for h in hours %}
+                <option value="{{ h }}">
+                    {{ format_hour(h) }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">
+                🌤️ Current Weather
+            </label>
+            <select name="weather" class="form-select" required>
+                <option value="">Select weather...</option>
+                {% for w in weather_options %}
+                <option value="{{ w }}">{{ w }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="is_holiday"
+                       id="holidaySwitch">
+                <label class="form-check-label fw-semibold"
+                       for="holidaySwitch">
+                    🎉 Public holiday today?
+                </label>
+            </div>
+        </div>
+
+        <button type="submit"
+                class="btn btn-dark w-100 py-2 fw-bold">
+            🔍 Predict Rush Level
+        </button>
+
+    </form>
+    </div>
+    </div>
+
+    <div class="text-center mt-3 text-muted small">
+        🟢 Low = comfortable &nbsp;|&nbsp;
+        🟡 Medium = slightly crowded &nbsp;|&nbsp;
+        🔴 High = very crowded
+    </div>
+
+</div>
+</div>
+
+{% endblock %}

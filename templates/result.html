@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-md-8 col-lg-7">
+
+    <!-- MAIN PREDICTION RESULT -->
+    <div class="card shadow text-center mb-4"
+         style="border-left:5px solid {{ result.color }};
+                background:{{ result.bg_color }}">
+        <div class="card-body py-4">
+            <div style="font-size:3.5rem">{{ result.emoji }}</div>
+            <h2 class="fw-bold mt-1"
+                style="color:{{ result.color }}">
+                {{ result.rush_level }} Rush
+            </h2>
+            <p class="text-muted mb-1 fs-6">
+                {{ result.text }}
+            </p>
+            <p class="text-muted mb-3">
+                <strong>{{ result.confidence }}%</strong> confidence
+            </p>
+
+            <!-- PROBABILITY BARS -->
+            <div class="text-start px-3">
+                {% for label, prob in result.all_probabilities.items() %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between">
+                        <small class="fw-bold">{{ label }}</small>
+                        <small>{{ prob }}%</small>
+                    </div>
+                    <div class="progress" style="height:9px">
+                        <div class="progress-bar"
+                             style="width:{{ prob }}%;
+                             background-color:
+                             {% if label=='Low' %}#27AE60
+                             {% elif label=='Medium' %}#F39C12
+                             {% else %}#E74C3C{% endif %}">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- JOURNEY DETAILS -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header text-white fw-bold"
+             style="background:#1a252f">
+            📋 Your Journey Details
+        </div>
+        <div class="card-body">
+            <div class="row g-2 text-center">
+                <div class="col-4">
+                    <small class="text-muted d-block">Route</small>
+                    <span class="fw-bold small">{{ route }}</span>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Day</small>
+                    <span class="fw-bold small">{{ day }}</span>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Time</small>
+                    <span class="fw-bold small">
+                        {{ format_hour(hour) }}
+                    </span>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Weather</small>
+                    <span class="fw-bold small">{{ weather }}</span>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Capacity</small>
+                    <span class="fw-bold small">
+                        {{ capacity }} seats
+                    </span>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Holiday</small>
+                    <span class="fw-bold small">
+                        {{ "Yes 🎉" if is_holiday else "No" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BEST TRAVEL TIME -->
+    <div class="card shadow-sm mb-4"
+         style="border-left:4px solid #27AE60">
+        <div class="card-header fw-bold"
+             style="background:#EAFAF1">
+            ⏰ Best Time to Travel on {{ day }}
+        </div>
+        <div class="card-body text-center py-3">
+            <h3 class="text-success fw-bold mb-1">
+                {{ best_time.formatted }}
+            </h3>
+            <p class="text-muted mb-1">
+                Expected: 🟢 {{ best_time.rush_level }} rush
+            </p>
+            <small class="text-muted">
+                {{ best_time.low_probability }}% chance of
+                Low rush at this time
+            </small>
+        </div>
+    </div>
+
+    <!-- HOURLY FORECAST -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header text-white fw-bold"
+             style="background:#1a252f">
+            📊 All-Day Rush Forecast — {{ day }}
+        </div>
+        <div class="card-body p-2">
+            <div class="d-flex flex-wrap gap-1
+                         justify-content-center">
+                {% for slot in hourly_forecast %}
+                <div class="text-center p-1 rounded"
+                     style="min-width:52px;
+                     background:
+                     {% if slot.rush=='High' %}#FDEDEC
+                     {% elif slot.rush=='Medium' %}#FEF9EC
+                     {% else %}#EAFAF1{% endif %}">
+                    <div style="font-size:0.65rem;color:#666">
+                        {{ slot.hour_label.split(':')[0] }}
+                        {{ 'AM' if 'AM' in slot.hour_label
+                           else 'PM' }}
+                    </div>
+                    <div style="font-size:1rem">
+                        {% if slot.rush=='High' %}🔴
+                        {% elif slot.rush=='Medium' %}🟡
+                        {% else %}🟢{% endif %}
+                    </div>
+                    {% if slot.is_peak %}
+                    <div style="font-size:0.5rem;
+                                color:#E74C3C">PEAK</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="text-center mt-2">
+                <small class="text-muted">
+                    🟢 Low &nbsp;|&nbsp; 🟡 Medium &nbsp;|&nbsp;
+                    🔴 High &nbsp;|&nbsp;
+                    <span style="color:#E74C3C">PEAK</span>
+                    = rush hour
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- PASSENGER COUNT BETWEEN STOPS -->
+    {% if passenger_flow and passenger_flow.flows %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header text-white fw-bold"
+             style="background:#1a252f">
+            👥 Passengers Travelling Between Stops
+            <small class="text-muted ms-2">
+                How many people travel each segment
+            </small>
+        </div>
+
+        <div class="card-body">
+
+            <!-- Route stops visual -->
+            <div class="mb-3">
+                <small class="text-muted fw-bold d-block mb-1">
+                    Route stops:
+                </small>
+                <div class="d-flex align-items-center
+                             flex-wrap gap-1">
+                    {% for stop in passenger_flow.route_stops %}
+                        <span class="badge px-2 py-1"
+                              style="background:#1a252f;
+                                     font-size:0.7rem">
+                            {{ stop }}
+                        </span>
+                        {% if not loop.last %}
+                        <span class="text-muted fw-bold">→</span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <small class="text-muted d-block mt-1">
+                    {{ passenger_flow.total_stops }} stops ·
+                    {{ passenger_flow.capacity }} seat capacity
+                </small>
+            </div>
+
+            <!-- Most and Least crowded segments -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="p-2 rounded text-center"
+                         style="background:#FDEDEC;
+                                border:1px solid #E74C3C">
+                        <small class="text-muted d-block">
+                            🔴 Most crowded segment
+                        </small>
+                        <div class="fw-bold small text-danger">
+                            {{ passenger_flow.most_crowded.from_stop }}
+                            →
+                            {{ passenger_flow.most_crowded.to_stop }}
+                        </div>
+                        <div class="fw-bold fs-5">
+                            {{ passenger_flow.most_crowded.passengers }}
+                            <small class="text-muted fw-normal
+                                          fs-6">pax</small>
+                        </div>
+                        <div class="progress mt-1"
+                             style="height:5px">
+                            <div class="progress-bar bg-danger"
+                                 style="width:{{ passenger_flow.most_crowded.percentage }}%">
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            {{ passenger_flow.most_crowded.percentage }}%
+                            capacity
+                        </small>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-2 rounded text-center"
+                         style="background:#EAFAF1;
+                                border:1px solid #27AE60">
+                        <small class="text-muted d-block">
+                            🟢 Least crowded segment
+                        </small>
+                        <div class="fw-bold small text-success">
+                            {{ passenger_flow.least_crowded.from_stop }}
+                            →
+                            {{ passenger_flow.least_crowded.to_stop }}
+                        </div>
+                        <div class="fw-bold fs-5">
+                            {{ passenger_flow.least_crowded.passengers }}
+                            <small class="text-muted fw-normal
+                                          fs-6">pax</small>
+                        </div>
+                        <div class="progress mt-1"
+                             style="height:5px">
+                            <div class="progress-bar bg-success"
+                                 style="width:{{ passenger_flow.least_crowded.percentage }}%">
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            {{ passenger_flow.least_crowded.percentage }}%
+                            capacity
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All stop-to-stop table -->
+            <small class="text-muted fw-bold d-block mb-2">
+                Complete passenger count — all stop combinations:
+            </small>
+            <div class="table-responsive">
+            <table class="table table-sm table-hover mb-2">
+                <thead class="table-dark">
+                    <tr>
+                        <th><small>From Stop</small></th>
+                        <th><small>To Stop</small></th>
+                        <th class="text-center">
+                            <small>Passengers</small>
+                        </th>
+                        <th><small>Load %</small></th>
+                        <th class="text-center">
+                            <small>Status</small>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for flow in passenger_flow.flows %}
+                    <tr {% if flow.is_direct %}
+                        style="background:#FAFBFC"
+                        {% endif %}>
+                        <td>
+                            <small>{{ flow.from_stop }}</small>
+                            {% if flow.is_direct %}
+                            <span class="badge bg-secondary
+                                         ms-1"
+                                  style="font-size:0.55rem">
+                                direct
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ flow.to_stop }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge fw-bold"
+                                  style="background:{{ flow.color }}">
+                                {{ flow.passengers }}
+                            </span>
+                        </td>
+                        <td style="min-width:90px">
+                            <div class="progress"
+                                 style="height:7px;
+                                        margin-top:6px">
+                                <div class="progress-bar"
+                                     style="width:{{ flow.percentage }}%;
+                                            background:{{ flow.color }}">
+                                </div>
+                            </div>
+                            <small class="text-muted">
+                                {{ flow.percentage }}%
+                            </small>
+                        </td>
+                        <td class="text-center">
+                            {% if flow.rush=='High' %}🔴
+                            {% elif flow.rush=='Medium' %}🟡
+                            {% else %}🟢{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- Smart tip -->
+            <div class="alert alert-info py-2 mb-0 small">
+                💡 <strong>Smart Tip:</strong>
+                Board at
+                <strong>
+                    {{ passenger_flow.least_crowded.from_stop }}
+                </strong>
+                for a comfortable journey —
+                only
+                <strong>
+                    {{ passenger_flow.least_crowded.passengers }}
+                    passengers
+                </strong>
+                ({{ passenger_flow.least_crowded.percentage }}%
+                capacity) on that segment.
+            </div>
+
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ADVICE ALERT -->
+    <div class="alert text-center fw-semibold
+        {% if result.rush_level=='High' %}alert-danger
+        {% elif result.rush_level=='Medium' %}alert-warning
+        {% else %}alert-success{% endif %} mb-4">
+        {% if result.rush_level=='High' %}
+            🔴 Very crowded! Best time today:
+            <strong>{{ best_time.formatted }}</strong>
+        {% elif result.rush_level=='Medium' %}
+            🟡 Moderately crowded. Arrive early at stop.
+        {% else %}
+            🟢 Great time to travel! Comfortable journey expected.
+        {% endif %}
+    </div>
+
+    <div class="d-grid">
+        <a href="/" class="btn btn-dark fw-bold py-2">
+            🔄 Check Another Route
+        </a>
+    </div>
+
+</div>
+</div>
+{% endblock %}
